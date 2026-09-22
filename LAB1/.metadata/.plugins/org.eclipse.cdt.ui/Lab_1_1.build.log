@@ -1,0 +1,22 @@
+00:22:53 **** Build of configuration Debug for project Lab_1_1 ****
+make -j32 all 
+arm-none-eabi-gcc -o "Lab_1_1.elf" @"objects.list"   -mcpu=cortex-m3 -T"E:\Study\HK261\VXL_VDK\LAB\LAB1\Lab_1_1\STM32F103C6UX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Lab_1_1.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Lab_1_1.elf
+ 
+arm-none-eabi-size   Lab_1_1.elf 
+arm-none-eabi-objdump -h -S  Lab_1_1.elf  > "Lab_1_1.list"
+arm-none-eabi-objcopy  -O ihex  Lab_1_1.elf  "Lab_1_1.hex"
+   text	   data	    bss	    dec	    hex	filename
+   4564	     20	   1572	   6156	   180c	Lab_1_1.elf
+arm-none-eabi-objcopy  -O binary  Lab_1_1.elf  "Lab_1_1.bin"
+Finished building: default.size.stdout
+ 
+Finished building: Lab_1_1.hex
+Finished building: Lab_1_1.bin
+ 
+Finished building: Lab_1_1.list
+ 
+ 
+
+00:22:54 Build Finished. 0 errors, 0 warnings. (took 405ms)
+
