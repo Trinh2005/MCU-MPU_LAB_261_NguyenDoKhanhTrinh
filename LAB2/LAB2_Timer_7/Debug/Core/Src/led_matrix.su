@@ -1,0 +1,8 @@
+led_matrix.c:59:13:writeMatrixRow	24	static
+led_matrix.c:73:13:enableMatrixColumn	24	static
+led_matrix.c:85:6:clearLEDMatrix	8	static
+led_matrix.c:96:6:updateLEDMatrix	16	static
+led_matrix.c:143:23:findGlyph	24	static
+led_matrix.c:157:6:loadCharToMatrix	24	static
+led_matrix.c:174:6:initScrollText	32	static
+led_matrix.c:199:6:shiftLEDMatrixLeft	16	static

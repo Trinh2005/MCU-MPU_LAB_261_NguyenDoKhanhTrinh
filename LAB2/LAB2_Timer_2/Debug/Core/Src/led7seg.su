@@ -1,0 +1,6 @@
+led7seg.c:38:6:display7SEG	24	static
+led7seg.c:61:6:enable7SEG	16	static
+led7seg.c:74:6:update7SEG	16	static
+led7seg.c:109:6:updateClockBuffer	16	static
+led7seg.c:121:6:setDot	16	static
+led7seg.c:126:6:toggleDot	8	static

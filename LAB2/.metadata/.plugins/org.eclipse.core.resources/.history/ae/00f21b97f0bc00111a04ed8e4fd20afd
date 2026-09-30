@@ -1,0 +1,215 @@
+/*
+ ******************************************************************************
+ * @file    led_matrix.c
+ * @brief   Driver quét LED matrix 8x8 (bài 3.9 và 3.10)
+ ******************************************************************************
+ */
+
+#include "led_matrix.h"
+
+/* Chân dữ liệu 8 hàng: ROW0..ROW7 -> PB8..PB15 */
+static const uint16_t rowPins[MAX_LED_MATRIX] = {
+    ROW0_Pin, ROW1_Pin, ROW2_Pin, ROW3_Pin,
+    ROW4_Pin, ROW5_Pin, ROW6_Pin, ROW7_Pin
+};
+
+/* Chân chọn cột (đi vào ULN2803): ENM0..ENM7 */
+static const uint16_t colPins[MAX_LED_MATRIX] = {
+    ENM0_Pin, ENM1_Pin, ENM2_Pin, ENM3_Pin,
+    ENM4_Pin, ENM5_Pin, ENM6_Pin, ENM7_Pin
+};
+
+/* --------------------------------------------------------------------------
+ * Font 5x7: mỗi ký tự gồm 5 cột, bit0 = ROW0 (hàng trên cùng).
+ * Thêm ký tự mới vào bảng này nếu muốn hiển thị chuỗi khác.
+ * -------------------------------------------------------------------------- */
+typedef struct {
+    char    c;
+    uint8_t col[5];
+} Glyph;
+
+static const Glyph font5x7[] = {
+    { 'A', { 0x7E, 0x11, 0x11, 0x11, 0x7E } },
+    { 'B', { 0x7F, 0x49, 0x49, 0x49, 0x36 } },
+    { 'C', { 0x3E, 0x41, 0x41, 0x41, 0x22 } },
+    { 'H', { 0x7F, 0x08, 0x08, 0x08, 0x7F } },
+    { 'K', { 0x7F, 0x08, 0x14, 0x22, 0x41 } },
+    { 'M', { 0x7F, 0x02, 0x0C, 0x02, 0x7F } },
+    { 'T', { 0x01, 0x01, 0x7F, 0x01, 0x01 } },
+    { 'U', { 0x3F, 0x40, 0x40, 0x40, 0x3F } },
+    { ' ', { 0x00, 0x00, 0x00, 0x00, 0x00 } }
+};
+
+#define FONT_SIZE   (sizeof(font5x7) / sizeof(font5x7[0]))
+
+/* Dữ liệu đang hiển thị: mặc định là ký tự 'A' (yêu cầu của bài 9) */
+uint8_t matrix_buffer[MAX_LED_MATRIX] = {
+    0x00, 0x7E, 0x11, 0x11, 0x11, 0x7E, 0x00, 0x00
+};
+int index_led_matrix = 0;
+
+/* Bộ đệm và vị trí cửa sổ của chuỗi chạy (bài 10) */
+static uint8_t scroll_frame[SCROLL_MAX_COLUMNS];
+static int scroll_length = 0;
+static int scroll_offset = 0;
+
+/**
+ * @brief  Ghi dữ liệu 8 hàng ra PB8..PB15. Bit = 1 -> hàng đó sáng.
+ */
+static void writeMatrixRow(uint8_t data)
+{
+    int i;
+    for (i = 0; i < MAX_LED_MATRIX; i++) {
+        HAL_GPIO_WritePin(GPIOB, rowPins[i],
+                          (data & (1 << i)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    }
+}
+
+/**
+ * @brief  Chọn đúng một cột của LED matrix.
+ *         Ngõ vào ULN2803 ở mức 1 thì cột tương ứng được nối mass.
+ * @param  index: 0..7. Truyền -1 để tắt toàn bộ các cột.
+ */
+static void enableMatrixColumn(int index)
+{
+    int i;
+    for (i = 0; i < MAX_LED_MATRIX; i++) {
+        HAL_GPIO_WritePin(GPIOA, colPins[i],
+                          (i == index) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    }
+}
+
+/**
+ * @brief  Tắt toàn bộ LED matrix.
+ */
+void clearLEDMatrix(void)
+{
+    enableMatrixColumn(-1);
+    writeMatrixRow(0x00);
+}
+
+/**
+ * @brief  Quét một cột của LED matrix (tương tự update7SEG).
+ *         (Bài 9 - Program 1.9)
+ * @param  index: 0..7
+ */
+void updateLEDMatrix(int index)
+{
+    /* Tắt hết các cột trước khi đổi dữ liệu hàng để tránh lem */
+    enableMatrixColumn(-1);
+
+    switch (index) {
+        case 0:
+            writeMatrixRow(matrix_buffer[0]);
+            enableMatrixColumn(0);
+            break;
+        case 1:
+            writeMatrixRow(matrix_buffer[1]);
+            enableMatrixColumn(1);
+            break;
+        case 2:
+            writeMatrixRow(matrix_buffer[2]);
+            enableMatrixColumn(2);
+            break;
+        case 3:
+            writeMatrixRow(matrix_buffer[3]);
+            enableMatrixColumn(3);
+            break;
+        case 4:
+            writeMatrixRow(matrix_buffer[4]);
+            enableMatrixColumn(4);
+            break;
+        case 5:
+            writeMatrixRow(matrix_buffer[5]);
+            enableMatrixColumn(5);
+            break;
+        case 6:
+            writeMatrixRow(matrix_buffer[6]);
+            enableMatrixColumn(6);
+            break;
+        case 7:
+            writeMatrixRow(matrix_buffer[7]);
+            enableMatrixColumn(7);
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * @brief  Tìm dữ liệu 5 cột của một ký tự trong bảng font.
+ * @retval Con trỏ tới 5 byte dữ liệu, ký tự lạ trả về ô trống.
+ */
+static const uint8_t *findGlyph(char c)
+{
+    unsigned int i;
+    for (i = 0; i < FONT_SIZE; i++) {
+        if (font5x7[i].c == c) {
+            return font5x7[i].col;
+        }
+    }
+    return font5x7[FONT_SIZE - 1].col;      /* ký tự ' ' ở cuối bảng */
+}
+
+/**
+ * @brief  Nạp một ký tự vào matrix_buffer, căn giữa trên 8 cột.
+ */
+void loadCharToMatrix(char c)
+{
+    const uint8_t *glyph = findGlyph(c);
+    int i;
+
+    matrix_buffer[0] = 0x00;
+    for (i = 0; i < 5; i++) {
+        matrix_buffer[i + 1] = glyph[i];
+    }
+    matrix_buffer[6] = 0x00;
+    matrix_buffer[7] = 0x00;
+}
+
+/**
+ * @brief  Dựng chuỗi ký tự thành một "băng" cột liên tục để chạy chữ.
+ *         Mỗi ký tự chiếm 5 cột + 1 cột trống ngăn cách.
+ */
+void initScrollText(const char *text)
+{
+    const char *p;
+    const uint8_t *glyph;
+    int i;
+
+    scroll_length = 0;
+    scroll_offset = 0;
+
+    for (p = text; *p != '\0'; p++) {
+        if (scroll_length + 6 > SCROLL_MAX_COLUMNS) {
+            break;
+        }
+        glyph = findGlyph(*p);
+        for (i = 0; i < 5; i++) {
+            scroll_frame[scroll_length++] = glyph[i];
+        }
+        scroll_frame[scroll_length++] = 0x00;
+    }
+}
+
+/**
+ * @brief  Dịch nội dung hiển thị sang trái một cột (bài 10).
+ *         Cửa sổ 8 cột trượt dọc theo băng dữ liệu và quay vòng ở cuối chuỗi.
+ */
+void shiftLEDMatrixLeft(void)
+{
+    int i;
+
+    if (scroll_length == 0) {
+        return;
+    }
+
+    for (i = 0; i < MAX_LED_MATRIX; i++) {
+        matrix_buffer[i] = scroll_frame[(scroll_offset + i) % scroll_length];
+    }
+
+    scroll_offset++;
+    if (scroll_offset >= scroll_length) {
+        scroll_offset = 0;
+    }
+}

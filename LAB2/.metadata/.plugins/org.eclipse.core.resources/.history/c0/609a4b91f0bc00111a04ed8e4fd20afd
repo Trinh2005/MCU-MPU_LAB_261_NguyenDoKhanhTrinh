@@ -1,0 +1,129 @@
+/*
+ ******************************************************************************
+ * @file    led7seg.c
+ * @brief   Driver quét 4 LED 7 đoạn loại common anode.
+ ******************************************************************************
+ */
+
+#include "led7seg.h"
+
+/* --------------------------------------------------------------------------
+ * Bảng mã 7 đoạn cho LED common anode:
+ *   - Anode chung được cấp nguồn qua transistor PNP
+ *   - Mỗi đoạn a..g sáng khi chân điều khiển ở mức 0
+ * -------------------------------------------------------------------------- */
+static const uint8_t segTable[11][7] = {
+    /*  a  b  c  d  e  f  g */
+    {   0, 0, 0, 0, 0, 0, 1 },  /* 0  */
+    {   1, 0, 0, 1, 1, 1, 1 },  /* 1  */
+    {   0, 0, 1, 0, 0, 1, 0 },  /* 2  */
+    {   0, 0, 0, 0, 1, 1, 0 },  /* 3  */
+    {   1, 0, 0, 1, 1, 0, 0 },  /* 4  */
+    {   0, 1, 0, 0, 1, 0, 0 },  /* 5  */
+    {   0, 1, 0, 0, 0, 0, 0 },  /* 6  */
+    {   0, 0, 0, 1, 1, 1, 1 },  /* 7  */
+    {   0, 0, 0, 0, 0, 0, 0 },  /* 8  */
+    {   0, 0, 0, 0, 1, 0, 0 },  /* 9  */
+    {   1, 1, 1, 1, 1, 1, 1 }   /* 10 - tắt hết các đoạn */
+};
+
+/* Giá trị hiển thị mặc định, được ghi đè bởi updateClockBuffer() */
+int led_buffer[MAX_LED] = { 1, 2, 3, 4 };
+int index_led = 0;
+
+/**
+ * @brief  Xuất mã 7 đoạn của một chữ số ra PB0..PB6.
+ * @param  num: 0..9, hoặc LED_BLANK (10) để tắt hết các đoạn.
+ */
+void display7SEG(int num)
+{
+    const uint8_t *seg;
+
+    if (num < 0 || num > LED_BLANK) {
+        num = LED_BLANK;
+    }
+    seg = segTable[num];
+
+    HAL_GPIO_WritePin(SEG0_GPIO_Port, SEG0_Pin, seg[0] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(SEG1_GPIO_Port, SEG1_Pin, seg[1] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(SEG2_GPIO_Port, SEG2_Pin, seg[2] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(SEG3_GPIO_Port, SEG3_Pin, seg[3] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(SEG4_GPIO_Port, SEG4_Pin, seg[4] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(SEG5_GPIO_Port, SEG5_Pin, seg[5] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(SEG6_GPIO_Port, SEG6_Pin, seg[6] ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+/**
+ * @brief  Cấp nguồn cho đúng một LED 7 đoạn.
+ *         Transistor PNP dẫn khi chân EN ở mức 0.
+ * @param  index: 0..3. Truyền -1 (hoặc giá trị ngoài khoảng) để tắt cả 4 LED.
+ */
+void enable7SEG(int index)
+{
+    HAL_GPIO_WritePin(EN0_GPIO_Port, EN0_Pin, (index == 0) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(EN1_GPIO_Port, EN1_Pin, (index == 1) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(EN2_GPIO_Port, EN2_Pin, (index == 2) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(EN3_GPIO_Port, EN3_Pin, (index == 3) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+/**
+ * @brief  Quét một LED 7 đoạn: lấy dữ liệu từ led_buffer[index] rồi bật LED đó.
+ *         (Bài 3 - Program 1.4)
+ * @param  index: 0..3
+ */
+void update7SEG(int index)
+{
+    /* Tắt cả 4 LED trước khi đổi dữ liệu để tránh hiện tượng lem (ghosting) */
+    enable7SEG(-1);
+
+    switch (index) {
+        case 0:
+            /* Display the first 7SEG with led_buffer[0] */
+            display7SEG(led_buffer[0]);
+            enable7SEG(0);
+            break;
+        case 1:
+            /* Display the second 7SEG with led_buffer[1] */
+            display7SEG(led_buffer[1]);
+            enable7SEG(1);
+            break;
+        case 2:
+            /* Display the third 7SEG with led_buffer[2] */
+            display7SEG(led_buffer[2]);
+            enable7SEG(2);
+            break;
+        case 3:
+            /* Display the forth 7SEG with led_buffer[3] */
+            display7SEG(led_buffer[3]);
+            enable7SEG(3);
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * @brief  Nạp giờ và phút vào led_buffer để hiển thị dạng HH MM.
+ *         Số có một chữ số tự động được thêm số 0 ở trước (8 -> "08").
+ */
+void updateClockBuffer(int hour, int minute)
+{
+    led_buffer[0] = hour / 10;
+    led_buffer[1] = hour % 10;
+    led_buffer[2] = minute / 10;
+    led_buffer[3] = minute % 10;
+}
+
+/**
+ * @brief  Bật/tắt 2 LED DOT ở giữa đồng hồ (PA4).
+ *         Hai LED nối từ +3.3V xuống chân PA4 nên mức 0 là sáng.
+ */
+void setDot(int on)
+{
+    HAL_GPIO_WritePin(DOT_GPIO_Port, DOT_Pin, on ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+void toggleDot(void)
+{
+    HAL_GPIO_TogglePin(DOT_GPIO_Port, DOT_Pin);
+}
