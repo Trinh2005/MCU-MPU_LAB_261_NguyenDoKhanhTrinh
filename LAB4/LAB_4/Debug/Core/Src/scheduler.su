@@ -1,0 +1,8 @@
+scheduler.c:17:17:insertTask	32	static
+scheduler.c:42:13:removeAt	24	static
+scheduler.c:51:6:SCH_Init	4	static
+scheduler.c:57:10:get_time	4	static
+scheduler.c:62:6:SCH_Update	4	static
+scheduler.c:70:6:SCH_Dispatch_Tasks	32	static,ignoring_inline_asm
+scheduler.c:86:10:SCH_Add_Task	32	static,ignoring_inline_asm
+scheduler.c:98:9:SCH_Delete_Task	24	static,ignoring_inline_asm
